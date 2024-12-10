@@ -1,0 +1,54 @@
+######    Memory w/4 Cycle Delay Specification   ###############################################################
+
+This module can be used as Instruction or Data by setting the parameters.
+
+memory4c #(AWIDTH=16,
+           DWIDTH=16
+        ) memory4c (
+            <snip>
+        );
+Memory will load "loadfile_data.img" if present.
+
+                      +-------------+ 
+data_in[15:0] >-------|             |--------> data_out[15:0] 
+   addr[15:0] >-------|   16 bit    |--------> data_valid 
+       enable >-------|   memory    |
+           wr >-------|             |
+          clk >-------|             |
+          rst >-------|             |
+                      |             |
+                      |             |
+                      +-------------+
+
+
+During each cycle, the "enable" and "wr" inputs determine what function the memory will perform: 
+
+enable wr  Function       data_out 
+0      X   No operation   0 
+1      0   Read M[addr]   M[addr] (4 cycles later)
+1      1   Write data_in  0 
+
+When a Read is received, it will return data on the 4th cycle and data_valid will also be set. The memory is pipelined such that
+it can take a new read every cycle and return data 4 cycles later. Writes will take effect in 1 cycle, such that a write
+followed immediately by a read to the same address will return the value from the write.
+
+
+#########   How to initialize your memory   ##################################################################
+
+The memory is intialized from a file called loadfile_data.img. The file is loaded at the first rising edge of
+the clock during reset. The standard $readmemh file format is: 
+
+@0 
+1234 
+1234 
+1234 
+1234 
+
+where "@0" specifies a starting address of zero, and "1234" represents any 4-digit hex number. Any number of lines
+may be specified, up to the size of the memory. The assembler will produce files in this format.
+
+#########   How to dump your memory         ##################################################################
+
+When you detect Halt in wisc_trace_p3.v module, you can use the following to dump the contents of cpu.path.to.mem 
+to a file called "dumpfile_data.img":
+$writememh("dumpfile_data.img", cpu.path.to.mem);
