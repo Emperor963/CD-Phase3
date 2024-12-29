@@ -50,11 +50,13 @@ module wisc_trace_p3 #(
 
   always @(posedge clk) begin
     cycle_count <= cycle_count + 1;
-    if (cycle_count > 100000) begin
+    if (cycle_count > 25) begin
       $display("hmm....more than 100000 cycles of simulation...error?\n");
       $finish;
     end
   end
+
+
 
   always @(posedge clk) begin
     if (!rst) begin
@@ -70,6 +72,7 @@ module wisc_trace_p3 #(
       $fdisplay(sim_log_file, "SIMLOG:: Cycle %d PC: %8x I: %8x R: %d %3d %8x M: %d %d %8x %8x %8x",
                 cycle_count, PC, Inst, RegWrite, WriteRegister, WriteData, MemRead, MemWrite,
                 MemAddress, MemDataIn, MemDataOut);
+      $display("Instruction I'm stuck in: %h", Inst);
 
       if (RegWrite) begin
         // After reset, ID will have Inst==0, which is ADD R0, R0, R0 (aka NOP), but control still decodes
@@ -101,7 +104,7 @@ module wisc_trace_p3 #(
         $fdisplay(sim_log_file, "SIMLOG:: dcache_req_count %d\n", dcache_req_count);
         $fdisplay(sim_log_file, "SIMLOG:: dcache_hit_count %d\n", dcache_hit_count);
 
-        $writememh("dumpfile_data.img", DUT.dmem.mem);
+        $writememh("dumpfile_data.img", DUT.CacheData.L2Shared.mem);
 
         $fclose(trace_file);
         $fclose(sim_log_file);

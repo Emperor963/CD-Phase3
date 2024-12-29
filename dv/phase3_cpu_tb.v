@@ -25,7 +25,7 @@ module phase3_cpu_tb ();
 
   initial begin
     rst <= 1;  /* Intial reset state */
-    repeat (3) @(negedge clk);
+    repeat (4) @(posedge clk);
     rst <= 0;
   end
 
@@ -36,19 +36,19 @@ module phase3_cpu_tb ();
       .rst(rst),
       .PC(PC),
       .Halt(Halt),
-      .Inst(DUT.id_instruction),
-      .RegWrite(DUT.register_file.write_reg),
-      .WriteRegister(DUT.register_file.dst_reg),
-      .WriteData(DUT.register_file.dst_data),
-      .MemRead(DUT.dmem.enable & ~DUT.dmem.wr),
-      .MemWrite(DUT.dmem.enable & DUT.dmem.wr),
-      .MemAddress(DUT.dmem.addr),
-      .MemDataIn(DUT.dmem.data_in),
-      .MemDataOut(DUT.dmem.data_out),
-      .icache_req(DUT.icache_req),
-      .icache_hit(DUT.icache_hit),
-      .dcache_req(DUT.dcache_req),
-      .dcache_hit(DUT.dcache_hit)
+      .Inst(DUT.instruction),
+      .RegWrite(DUT.RF.write_reg),
+      .WriteRegister(DUT.RF.dst_reg),
+      .WriteData(DUT.RF.dst_data),
+      .MemRead(DUT.MemRead),
+      .MemWrite(DUT.MemWrite),
+      .MemAddress(DUT.CacheData.d_addr),
+      .MemDataIn(DUT.CacheData.cpu_data_in),
+      .MemDataOut(DUT.DMem_Read),
+      .icache_req(DUT.CacheData.i_ren),
+      .icache_hit(~DUT.ic_miss),
+      .dcache_req(DUT.CacheData.d_ren),
+      .dcache_hit(~DUT.dc_miss)
   );
 
   /* Add anything else you want here */

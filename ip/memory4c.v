@@ -30,6 +30,7 @@ module memory4c #(
 ) (
     output wire [DWIDTH-1:0] data_out,
     output wire data_valid,
+    output wire [DWIDTH-1:0] addr_out,
     input [DWIDTH-1:0] data_in,
     input [AWIDTH-1:0] addr,
     input enable,
@@ -42,11 +43,13 @@ module memory4c #(
 
   reg  [DWIDTH-1:0] data_out_pl            [0:CycleDelays-1];
   reg               data_valid_pl          [0:CycleDelays-1];
+  reg  [DWIDTH-1:0] data_addr_pl           [0:CycleDelays-1];
   reg  [DWIDTH-1:0] mem                    [    0:MemSize-1];
   reg               loaded;
   wire              is_read = enable & ~wr;
   wire              is_write = enable & wr;
   assign data_out   = data_out_pl[0];
+  assign addr_out   = data_addr_pl[0];
   assign data_valid = data_valid_pl[0];
 
   initial begin
@@ -69,13 +72,16 @@ module memory4c #(
     if (rst) begin
       for (i = 0; i < CycleDelays; i = i + 1) begin
         data_out_pl[i]   <= 0;
+        data_addr_pl[i]  <= 0;
         data_valid_pl[i] <= 0;
       end
     end else begin
       data_out_pl[CycleDelays-1]   <= is_read ? {mem[addr[AWIDTH-1:1]]} : 0;
+      data_addr_pl[CycleDelays-1]   <= is_read? addr[AWIDTH-1 : 0] : 0;
       data_valid_pl[CycleDelays-1] <= is_read;
       for (i = 0; i < CycleDelays - 1; i = i + 1) begin
         data_out_pl[i]   <= data_out_pl[i+1];
+        data_addr_pl[i] <= data_addr_pl[i+1];
         data_valid_pl[i] <= data_valid_pl[i+1];
       end
     end

@@ -9,13 +9,13 @@ module cpu(
 
 ////////////////////////////////// INITIALIZING ALL WIRES ////////////////////////////////////////////////////////
 
-wire halter, halt;
+wire halter, halt, fsmbusy;
 
 Halt haltHold(.clk(clk), .rst(rst), .wen(halt), .in(halt), .out(halter));
 
 wire [15:0] pc_curr, pc_next, IF_ID_pc_out, ID_EX_pc_out;
-wire [15:0] instruction, IF_ID_instr_out;
-wire IF_ID_STALL, pc_stall_hd1, pc_stall_hd2, pc_stall, HazDet1_IF_ID_STALL_OUT, HazDet2_IF_ID_STALL_OUT, HD_Stall, pc_wren;
+wire [15:0] instruction, IF_ID_instr_out, instr_stall_insert;
+wire IF_ID_STALL, pc_stall_hd1, pc_stall_hd2, pc_stall, HazDet1_IF_ID_STALL_OUT, HazDet2_IF_ID_STALL_OUT, HD_Stall, pc_wren, ic_miss, dc_miss;
 
 wire RegRead, MemRead, MemWrite, ALUSrc, RegWrite, LH, HLT;
 wire [1:0] MemtoReg, PCSrc;
@@ -65,13 +65,22 @@ assign hlt = halt;
 
 MUX16bit_4to1 PCSrcMux(.sigA(pc_updated), .sigB(RegisterBr), .sigC(pc_curr), .sigD(branch_address), .control(PCSrc), .out(pc_next));
 
-pc_reg PCRegister(.clk(clk), .rst(rst), .d(pc_next), .wen(pc_wren), .q(pc_curr));
+pc_reg PCRegister(.clk(clk), .rst(rst), .d(pc_next), .wen(pc_wren & ~ic_miss), .q(pc_curr));
 
-memory1c_instr IMem(.data_out(instruction), .addr(pc_curr), .clk(clk), .rst(rst), .enable(1'b1), .wr(1'b0));
+//memory1c_instr IMem(.data_out(instruction), .addr(pc_curr), .clk(clk), .rst(rst), .enable(1'b1), .wr(1'b0));
+//memory1c_data DMem(.data_out(DMem_Read), .data_in(M_ReadValue), .addr(M_ALUOut), .enable(EX_MEM_MemRead), .wr(EX_MEM_MemWrite), .clk(clk), .rst(rst));
 
-IF_ID_Reg IF_ID(.clk(clk), .rst(rst), .wren(~pc_stall), .IFID_Flush(IFIDFlush), .pc(pc_next), .instr(instruction), .pc_out(IF_ID_pc_out), .instr_out(IF_ID_instr_out));
+
+cache_wrapper CacheData(.clk(clk), .rst(rst), .i_addr(pc_curr), .i_ren(1'b1), .i_wren(1'b0), .i_out(instruction),
+                                               .d_addr(M_ALUOut), .cpu_data_in(M_ReadValue), .d_ren(EX_MEM_MemRead), .d_wren(EX_MEM_MemWrite),
+                                               .d_out(DMem_Read), .icache_miss(ic_miss), .dcache_miss(dc_miss), .fsm_busy(fsmbusy));
+
+
+
+IF_ID_Reg IF_ID(.clk(clk), .rst(rst), .wren(~pc_stall), .IFID_Flush(IFIDFlush), .pc(pc_next), .instr(instr_stall_insert), .pc_out(IF_ID_pc_out), .instr_out(IF_ID_instr_out));
 
 assign pc_wren = ~(halter | pc_stall);
+assign instr_stall_insert = (ic_miss & fsmbusy) ? 16'hA000 : instruction; //insert LLB R0 0 NOP
 
 //////////////////////////////// END FETCH STAGE ////////////////////////////////////////////////////////////////
 
@@ -108,7 +117,7 @@ control_hazard_detection HazDet2(.insn(IF_ID_instr_out), .regWriteX(ID_EX_RegWri
 assign pc_stall = pc_stall_hd1 | pc_stall_hd2;
 assign HD_Stall = HazDet1_IF_ID_STALL_OUT | HazDet2_IF_ID_STALL_OUT;
 
-cpu_control ControlUnit(.control(IF_ID_instr_out[15:12]), .RegRead(RegRead), .MemRead(MemRead), .MemtoReg(MemtoReg), .MemWrite(MemWrite), 
+cpu_control ControlUnit(.control(IF_ID_instr_out[15:12]), .auxinputs(IF_ID_instr_out[11:0]), .RegRead(RegRead), .MemRead(MemRead), .MemtoReg(MemtoReg), .MemWrite(MemWrite), 
                         .ALUOp(ALUOp), .ALUsrc(ALUSrc), .RegWrite(RegWrite), .PCSour(PCSrc), .LH(LH), .HLT(HLT), .fwr(fwr));
 
 
@@ -211,7 +220,7 @@ EX_MEM_Reg EX_MEM(.clk(clk), .rst(rst), .wren(1'b1), .iMemRead(ID_EX_MemRead), .
 
 wire [15:0] EX_ForwardingPath = (flag_in === 3'b000) ? M_LBOut : M_ALUOut;
 
-memory1c_data DMem(.data_out(DMem_Read), .data_in(M_ReadValue), .addr(M_ALUOut), .enable(EX_MEM_MemRead), .wr(EX_MEM_MemWrite), .clk(clk), .rst(rst));
+//memory1c_data DMem(.data_out(DMem_Read), .data_in(M_ReadValue), .addr(M_ALUOut), .enable(EX_MEM_MemRead), .wr(EX_MEM_MemWrite), .clk(clk), .rst(rst));
 
 MEM_WB_Reg MEM_WB(.clk(clk), .rst(rst), .wren(1'b1), .iMemtoReg(EX_MEM_MemtoReg), .iRegWrite(EX_MEM_RegWrite), .iHLT(EX_MEM_HLT), .iLBOut(M_LBOut), .iMemRd(DMem_Read), .iALUOut(M_ALUOut),
                   .idst_reg(M_dst_reg), .pc_in(EX_MEM_pc_out), .MemtoReg(MEM_WB_MemtoReg), .RegWrite(MEM_WB_RegWrite), .HLT(halt), .LBOut(W_LBOut), .MemRd(W_DMem_Read), .ALUOut(W_ALUOut),

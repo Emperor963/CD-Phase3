@@ -1,5 +1,6 @@
 module cpu_control(
     input [3:0]control,
+    input [11:0] auxinputs,
 
     output RegRead,
     output MemRead,
@@ -81,7 +82,7 @@ always @(*) begin
             result = 7'b1011000; ALU = 3'b000;  MR= 2'b10;  PCSource = 2'b00;  flags = 3'b000;     // SW
             end
             4'b1010:  begin                       
-            result = 7'b0001100; ALU = 3'b010;  MR= 2'b01;  PCSource = 2'b00; flags = 3'b000;     // LLB
+            result = 7'b0001100; ALU = 3'b010;  MR= 2'b01;  PCSource = (auxinputs == 12'd0) ? 2'b10 : 2'b00; flags = 3'b000;     // LLB
             end
             4'b1011:  begin                      
             result = 7'b0001110; ALU = 3'b010;  MR= 2'b01;  PCSource = 2'b00; flags = 3'b000;     // LHB

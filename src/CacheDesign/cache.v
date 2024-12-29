@@ -6,7 +6,7 @@ module cache (
     input wren, // control signal
     input rewrite,
     
-    output [15:0] data_out,
+    output [15:0] rd_data_out,
     output cache_miss
 );
 //literally nobody else will be able to understand this and im sorry
@@ -29,14 +29,14 @@ wire [7:0]word_enable;
 
 assign set_index = memAddr[9:4];
 
-assign valid = (cache_miss & !rewrite) ? 1'b0:(memAddr[0]);  //hopefully, fsm will be providing a valid bit of 1 for regular instructions
+assign valid = /*(cache_miss & !rewrite) ? 1'b0:*/(memAddr[0]);  //hopefully, fsm will be providing a valid bit of 1 for regular instructions
 
 assign in_tag = memAddr[15:10]; //assign in tag
 
 //check for cache miss. 
-assign cache_hit0 = (in_tag == Way0[7:2]) & Way0[1]; // checks if tags match and block is valid
-assign cache_hit1 = (in_tag == Way1[7:2]) & Way1[1]; //checks if tags match and block is valid
-assign cache_miss = !(cache_hit0 | cache_hit1); //neither match
+assign cache_hit0 = ((in_tag == Way0[7:2]) & Way0[1]) & ~rst; // checks if tags match and block is valid
+assign cache_hit1 = ((in_tag == Way1[7:2]) & Way1[1]) & ~rst; //checks if tags match and block is valid
+assign cache_miss = ~(cache_hit0 | cache_hit1); //neither match
 
 assign lru = cache_hit0 ? 1'b1 : 
              cache_hit1 ? 1'b0 :
@@ -52,19 +52,19 @@ assign wren1 = (cache_miss & Way0[0]);
 assign tag0 = (!cache_miss) ? {Way0[7:1],lru}:{in_tag,valid,lru}; //if there is a cache hit update the lru but keep the say data, if there is a cache miss write in the tag but mark the block as invalid
 assign tag1 = {in_tag, valid, 1'b1}; // if there is a cache miss write in the tag but mark the block as invalid.
 
-assign data_out = (cache_hit0) ? data_out0:data_out1;
+assign rd_data_out = (cache_hit0) ? data_out0:data_out1;
 
 assign dwren0 = (cache_hit0 & wren) | (cache_miss & !Way0[0]);
 assign dwren1 = (cache_hit1 & wren) | (cache_miss &  Way0[0]);
 
 
 //instantiate Meta data array here
-metadata_way_array MDW0 (.clk(clk), .rst(rst), .data_in(tag0), .wen(wren0), .set_enable(set_enable), .data_out(Way0));
-metadata_way_array MDW1 (.clk(clk), .rst(rst), .data_in(tag1), .wen(wren1), .set_enable(set_enable), .data_out(Way1));
+metadata_way_array_beh MDW0 (.clk(clk), .rst(rst), .data_in(tag0), .wen(wren0), .set_enable(set_enable), .data_out(Way0));
+metadata_way_array_beh MDW1 (.clk(clk), .rst(rst), .data_in(tag1), .wen(wren1), .set_enable(set_enable), .data_out(Way1));
 
 //Instantiate Data array here
-data_way_array DW0 (.clk(clk), .rst(rst), .data_in(data_in), .wen(dwren0), .set_enable(set_enable), .word_enable(word_enable), .data_out(data_out0));
-data_way_array DW1 (.clk(clk), .rst(rst), .data_in(data_in), .wen(dwren1), .set_enable(set_enable), .word_enable(word_enable), .data_out(data_out1)); 
+data_way_array_beh DW0 (.clk(clk), .rst(rst), .data_in(data_in), .wen(dwren0), .set_enable(set_enable), .word_enable(word_enable), .data_out(data_out0));
+data_way_array_beh DW1 (.clk(clk), .rst(rst), .data_in(data_in), .wen(dwren1), .set_enable(set_enable), .word_enable(word_enable), .data_out(data_out1)); 
 
 
 //Set enable decode logic
